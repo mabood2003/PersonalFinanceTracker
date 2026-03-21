@@ -1,0 +1,15 @@
+INSERT INTO categories (name, icon, color, is_default) VALUES
+    ('Groceries',       '🛒', '#4CAF50', TRUE),
+    ('Dining Out',      '🍽️', '#FF9800', TRUE),
+    ('Transportation',  '🚗', '#2196F3', TRUE),
+    ('Housing',         '🏠', '#9C27B0', TRUE),
+    ('Utilities',       '💡', '#607D8B', TRUE),
+    ('Entertainment',   '🎬', '#E91E63', TRUE),
+    ('Healthcare',      '🏥', '#00BCD4', TRUE),
+    ('Shopping',        '🛍️', '#FF5722', TRUE),
+    ('Education',       '📚', '#3F51B5', TRUE),
+    ('Salary',          '💰', '#4CAF50', TRUE),
+    ('Freelance',       '💻', '#8BC34A', TRUE),
+    ('Investment',      '📈', '#FFC107', TRUE),
+    ('Other Income',    '💵', '#CDDC39', TRUE),
+    ('Other Expense',   '📋', '#795548', TRUE);

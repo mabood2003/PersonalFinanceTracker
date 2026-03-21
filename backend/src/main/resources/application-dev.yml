@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/finance_tracker
+    username: postgres
+    password: postgres
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    com.moabood.financetracker: DEBUG
+    org.springframework.security: DEBUG
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
