@@ -1,0 +1,195 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { analyticsApi, type MonthlySummary, type CategoryBreakdown, type SpendingTrend } from '../api/analyticsApi'
+import { transactionApi, type Transaction } from '../api/transactionApi'
+import { accountApi } from '../api/accountApi'
+import { budgetApi, type BudgetProgress } from '../api/budgetApi'
+import SpendingChart from '../components/SpendingChart'
+import TrendChart from '../components/TrendChart'
+import TransactionTable from '../components/TransactionTable'
+import { TrendUpIcon, TrendDownIcon, ArrowRightIcon, WalletIcon } from '../components/Icons'
+
+function fmt(n: number) {
+  return n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 })
+}
+
+function getGreeting() {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+export default function DashboardPage() {
+  const { user } = useAuth()
+  const now = new Date()
+  const [summary, setSummary] = useState<MonthlySummary | null>(null)
+  const [breakdown, setBreakdown] = useState<CategoryBreakdown[]>([])
+  const [trend, setTrend] = useState<SpendingTrend[]>([])
+  const [recent, setRecent] = useState<Transaction[]>([])
+  const [totalBalance, setTotalBalance] = useState(0)
+  const [alertBudgets, setAlertBudgets] = useState<BudgetProgress[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const year = now.getFullYear()
+    const month = now.getMonth() + 1
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+    const lastDay = new Date(year, month, 0).getDate()
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${lastDay}`
+
+    Promise.all([
+      analyticsApi.getMonthlySummary(year, month),
+      analyticsApi.getCategoryBreakdown(startDate, endDate),
+      analyticsApi.getSpendingTrend(6),
+      transactionApi.getAll({ size: 6, sort: 'transactionDate,desc' }),
+      accountApi.getAll(),
+      budgetApi.getAll(),
+    ]).then(([s, b, t, txns, accounts, budgets]) => {
+      setSummary(s)
+      setBreakdown(b)
+      setTrend(t)
+      setRecent(txns.content)
+      setTotalBalance(accounts.reduce((sum, a) => sum + a.balance, 0))
+      setAlertBudgets(budgets.filter(bud => bud.status !== 'ON_TRACK'))
+    }).catch(console.error).finally(() => setLoading(false))
+  }, [])
+
+  const monthName = now.toLocaleString('default', { month: 'long' })
+  const netSavings = summary?.netSavings ?? 0
+  const savingsPositive = netSavings >= 0
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <p className="text-sm text-gray-500">{getGreeting()},</p>
+        <h1 className="text-2xl font-bold text-gray-900">{user?.firstName} {user?.lastName}</h1>
+      </div>
+
+      {/* Budget alerts */}
+      {alertBudgets.length > 0 && (
+        <div className="space-y-2">
+          {alertBudgets.map(b => (
+            <div key={b.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm border
+              ${b.status === 'EXCEEDED'
+                ? 'bg-danger-50 border-danger-100 text-danger-700'
+                : 'bg-warning-50 border-warning-100 text-warning-600'}`}>
+              <span className="text-base">{b.category.icon}</span>
+              <span>
+                <strong>{b.category.name}</strong> budget {b.status === 'EXCEEDED'
+                  ? `exceeded — $${(b.amountSpent - b.amountLimit).toLocaleString()} over limit`
+                  : `at ${b.percentUsed.toFixed(0)}% — $${b.amountRemaining.toLocaleString()} remaining`}
+              </span>
+              <Link to="/budgets" className="ml-auto text-xs font-semibold underline underline-offset-2 flex-shrink-0">
+                Review
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Net worth hero card */}
+      <div className="bg-gradient-to-br from-navy-800 to-navy-900 rounded-2xl p-6 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-56 h-56 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/3 pointer-events-none" />
+        <p className="text-navy-300 text-xs font-semibold uppercase tracking-wider mb-1">Total Balance</p>
+        <p className="text-4xl font-bold tracking-tight mb-4">{fmt(totalBalance)}</p>
+        <div className="flex items-center gap-2 text-sm">
+          <WalletIcon size={14} className="text-navy-300" />
+          <span className="text-navy-300">All accounts combined</span>
+          <Link to="/accounts" className="ml-auto text-white/70 hover:text-white flex items-center gap-1 text-xs font-medium transition-colors">
+            View accounts <ArrowRightIcon size={12} />
+          </Link>
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard
+          label={`Income — ${monthName}`}
+          value={fmt(summary?.totalIncome ?? 0)}
+          icon={<TrendUpIcon size={16} className="text-success-600" />}
+          iconBg="bg-success-50"
+          valueColor="text-success-700"
+          loading={loading}
+        />
+        <StatCard
+          label={`Expenses — ${monthName}`}
+          value={fmt(summary?.totalExpenses ?? 0)}
+          icon={<TrendDownIcon size={16} className="text-danger-600" />}
+          iconBg="bg-danger-50"
+          valueColor="text-danger-700"
+          loading={loading}
+        />
+        <StatCard
+          label={`Net Savings — ${monthName}`}
+          value={fmt(Math.abs(netSavings))}
+          prefix={savingsPositive ? '+' : '-'}
+          icon={<span className="text-sm">{savingsPositive ? '🎯' : '⚠️'}</span>}
+          iconBg={savingsPositive ? 'bg-primary-50' : 'bg-warning-50'}
+          valueColor={savingsPositive ? 'text-primary-700' : 'text-warning-600'}
+          loading={loading}
+        />
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="section-title">Spending by Category</h2>
+            <span className="text-xs text-gray-400">{monthName}</span>
+          </div>
+          <SpendingChart data={breakdown} />
+        </div>
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="section-title">Income vs Expenses</h2>
+            <span className="text-xs text-gray-400">Last 6 months</span>
+          </div>
+          <TrendChart data={trend} />
+        </div>
+      </div>
+
+      {/* Recent transactions */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="section-title">Recent Transactions</h2>
+          <Link
+            to="/transactions"
+            className="flex items-center gap-1 text-sm text-primary-600 font-medium hover:text-primary-700 transition-colors"
+          >
+            View all <ArrowRightIcon size={14} />
+          </Link>
+        </div>
+        <TransactionTable transactions={recent} compact />
+      </div>
+    </div>
+  )
+}
+
+function StatCard({ label, value, prefix, icon, iconBg, valueColor, loading }: {
+  label: string
+  value: string
+  prefix?: string
+  icon: React.ReactNode
+  iconBg: string
+  valueColor: string
+  loading: boolean
+}) {
+  return (
+    <div className="card p-5">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
+        <div className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center`}>{icon}</div>
+      </div>
+      {loading ? (
+        <div className="h-7 w-28 bg-gray-100 rounded-lg animate-pulse" />
+      ) : (
+        <p className={`text-xl font-bold tracking-tight ${valueColor}`}>
+          {prefix}{value}
+        </p>
+      )}
+    </div>
+  )
+}
