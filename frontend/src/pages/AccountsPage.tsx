@@ -27,6 +27,12 @@ const ACCOUNT_TYPE_OPTIONS: { value: Account['accountType']; label: string; icon
   { value: 'INVESTMENT',   label: 'Investment',   icon: '📈' },
 ]
 
+function netWorthContribution(account: Account) {
+  return account.accountType === 'CREDIT_CARD'
+    ? -Math.abs(account.balance)
+    : account.balance
+}
+
 export default function AccountsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -54,7 +60,7 @@ export default function AccountsPage() {
     setAccounts(prev => prev.filter(a => a.id !== id))
   }
 
-  const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0)
+  const totalBalance = accounts.reduce((sum, a) => sum + netWorthContribution(a), 0)
   const positiveBalance = totalBalance >= 0
 
   return (

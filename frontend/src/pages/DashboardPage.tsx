@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { analyticsApi, type MonthlySummary, type CategoryBreakdown, type SpendingTrend } from '../api/analyticsApi'
 import { transactionApi, type Transaction } from '../api/transactionApi'
-import { accountApi } from '../api/accountApi'
+import { accountApi, type Account } from '../api/accountApi'
 import { budgetApi, type BudgetProgress } from '../api/budgetApi'
 import SpendingChart from '../components/SpendingChart'
 import TrendChart from '../components/TrendChart'
@@ -12,6 +12,12 @@ import { TrendUpIcon, TrendDownIcon, ArrowRightIcon, WalletIcon } from '../compo
 
 function fmt(n: number) {
   return n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 })
+}
+
+function netWorthContribution(account: Account) {
+  return account.accountType === 'CREDIT_CARD'
+    ? -Math.abs(account.balance)
+    : account.balance
 }
 
 function getGreeting() {
@@ -51,7 +57,7 @@ export default function DashboardPage() {
       setBreakdown(b)
       setTrend(t)
       setRecent(txns.content)
-      setTotalBalance(accounts.reduce((sum, a) => sum + a.balance, 0))
+      setTotalBalance(accounts.reduce((sum, a) => sum + netWorthContribution(a), 0))
       setAlertBudgets(budgets.filter(bud => bud.status !== 'ON_TRACK'))
     }).catch(console.error).finally(() => setLoading(false))
   }, [])
