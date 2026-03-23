@@ -39,4 +39,7 @@ public class Budget extends BaseEntity {
 
     @Column(name = "end_date")
     private LocalDate endDate;
+
+    @Column(name = "auto_renew", nullable = false)
+    private boolean autoRenew = true;
 }

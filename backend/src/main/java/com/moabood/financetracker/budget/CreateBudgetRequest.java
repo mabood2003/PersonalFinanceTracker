@@ -24,4 +24,8 @@ public class CreateBudgetRequest {
 
     @NotNull
     private LocalDate startDate;
+
+    private LocalDate endDate;
+
+    private Boolean autoRenew = true;
 }

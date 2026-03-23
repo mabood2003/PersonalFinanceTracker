@@ -17,5 +17,6 @@ public class BudgetDto {
     private BudgetPeriod period;
     private LocalDate startDate;
     private LocalDate endDate;
+    private boolean autoRenew;
     private OffsetDateTime createdAt;
 }

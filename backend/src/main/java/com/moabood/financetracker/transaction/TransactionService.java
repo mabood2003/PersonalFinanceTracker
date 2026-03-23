@@ -53,7 +53,11 @@ public class TransactionService {
     @Transactional
     public TransactionDto createTransaction(CreateTransactionRequest request) {
         User user = userService.getCurrentUser();
+        return createTransactionForUser(user, request);
+    }
 
+    @Transactional
+    public TransactionDto createTransactionForUser(User user, CreateTransactionRequest request) {
         if (request.getType() == TransactionType.TRANSFER) {
             return createTransferTransaction(user, request);
         }

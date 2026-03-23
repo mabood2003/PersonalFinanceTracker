@@ -18,5 +18,7 @@ public class BudgetProgressDto {
     private double percentUsed;
     private BudgetPeriod period;
     private LocalDate startDate;
+    private LocalDate endDate;
+    private boolean autoRenew;
     private String status; // ON_TRACK, WARNING, EXCEEDED
 }
