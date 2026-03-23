@@ -11,14 +11,23 @@ interface Props {
   onCancel: () => void
 }
 
+function generateIdempotencyKey() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
 export default function TransactionForm({ accounts, categories, initial, onSubmit, onCancel }: Props) {
   const [form, setForm] = useState<CreateTransactionRequest>({
     accountId: initial?.accountId ?? (accounts[0]?.id ?? 0),
+    destinationAccountId: undefined,
     categoryId: initial?.category?.id,
     type: initial?.type ?? 'EXPENSE',
     amount: initial?.amount ?? 0,
     description: initial?.description ?? '',
     merchant: initial?.merchant ?? '',
+    idempotencyKey: initial?.type === 'TRANSFER' ? generateIdempotencyKey() : undefined,
     transactionDate: initial?.transactionDate ?? new Date().toISOString().slice(0, 10),
   })
   const [loading, setLoading] = useState(false)
@@ -29,15 +38,74 @@ export default function TransactionForm({ accounts, categories, initial, onSubmi
     if (!initial && !form.accountId && accounts[0]) {
       setForm(f => ({ ...f, accountId: accounts[0].id }))
     }
-  }, [accounts])
+  }, [accounts, initial, form.accountId])
+
+  // Keep transfer destination valid and different from source account.
+  useEffect(() => {
+    if (form.type !== 'TRANSFER') return
+
+    const currentDestination = form.destinationAccountId
+    const destinationStillValid = !!currentDestination
+      && currentDestination !== form.accountId
+      && accounts.some(a => a.id === currentDestination)
+
+    if (!destinationStillValid) {
+      const fallbackDestination = accounts.find(a => a.id !== form.accountId)?.id
+      if (fallbackDestination !== currentDestination) {
+        setForm(f => ({ ...f, destinationAccountId: fallbackDestination }))
+      }
+    }
+  }, [accounts, form.accountId, form.destinationAccountId, form.type])
+
+  function handleTypeChange(type: CreateTransactionRequest['type']) {
+    if (type === 'TRANSFER') {
+      const destinationAccountId = accounts.find(a => a.id !== form.accountId)?.id
+      setForm(f => ({
+        ...f,
+        type,
+        categoryId: undefined,
+        destinationAccountId,
+        idempotencyKey: f.idempotencyKey ?? generateIdempotencyKey(),
+      }))
+      return
+    }
+
+    setForm(f => ({
+      ...f,
+      type,
+      destinationAccountId: undefined,
+      idempotencyKey: undefined,
+    }))
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.accountId) { setError('Please select an account.'); return }
+
+    if (form.type === 'TRANSFER') {
+      if (!form.destinationAccountId) {
+        setError('Please select a destination account.')
+        return
+      }
+      if (form.destinationAccountId === form.accountId) {
+        setError('Source and destination accounts must be different.')
+        return
+      }
+    }
+
+    const payload: CreateTransactionRequest = {
+      ...form,
+      categoryId: form.type === 'TRANSFER' ? undefined : form.categoryId,
+      destinationAccountId: form.type === 'TRANSFER' ? form.destinationAccountId : undefined,
+      idempotencyKey: form.type === 'TRANSFER'
+        ? (form.idempotencyKey ?? generateIdempotencyKey())
+        : undefined,
+    }
+
     setLoading(true)
     setError('')
     try {
-      await onSubmit(form)
+      await onSubmit(payload)
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
       setError(msg ?? 'An error occurred. Please try again.')
@@ -46,13 +114,14 @@ export default function TransactionForm({ accounts, categories, initial, onSubmi
     }
   }
 
+  const transferSelected = form.type === 'TRANSFER'
   const incomeSelected = form.type === 'INCOME'
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
         <div className="flex items-start gap-2 px-4 py-3 bg-danger-50 border border-danger-100 rounded-xl text-sm text-danger-700">
-          <span className="mt-0.5">⚠</span>
+          <span className="mt-0.5">!</span>
           {error}
         </div>
       )}
@@ -60,21 +129,23 @@ export default function TransactionForm({ accounts, categories, initial, onSubmi
       {/* Type toggle */}
       <div>
         <label className="form-label">Transaction Type</label>
-        <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-xl">
-          {(['EXPENSE', 'INCOME'] as const).map(type => (
+        <div className="grid grid-cols-3 gap-2 p-1 bg-gray-100 rounded-xl">
+          {(['EXPENSE', 'INCOME', 'TRANSFER'] as const).map(type => (
             <button
               key={type}
               type="button"
-              onClick={() => setForm(f => ({ ...f, type }))}
+              onClick={() => handleTypeChange(type)}
               className={`py-2 rounded-lg text-sm font-semibold transition-all ${
                 form.type === type
                   ? type === 'INCOME'
                     ? 'bg-success-600 text-white shadow-sm'
-                    : 'bg-danger-600 text-white shadow-sm'
+                    : type === 'EXPENSE'
+                    ? 'bg-danger-600 text-white shadow-sm'
+                    : 'bg-primary-600 text-white shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {type === 'INCOME' ? '↑ Income' : '↓ Expense'}
+              {type === 'INCOME' ? 'Income' : type === 'EXPENSE' ? 'Expense' : 'Transfer'}
             </button>
           ))}
         </div>
@@ -87,10 +158,15 @@ export default function TransactionForm({ accounts, categories, initial, onSubmi
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">$</span>
           <input
             type="number" min="0.01" step="0.01" required
-            className={`form-input pl-8 font-semibold text-base ${incomeSelected ? 'focus:ring-success-500' : 'focus:ring-danger-500'}`}
+            className={`form-input pl-8 font-semibold text-base ${
+              transferSelected ? 'focus:ring-primary-500' : incomeSelected ? 'focus:ring-success-500' : 'focus:ring-danger-500'
+            }`}
             placeholder="0.00"
             value={form.amount || ''}
-            onChange={e => setForm(f => ({ ...f, amount: parseFloat(e.target.value) }))}
+            onChange={e => {
+              const value = e.target.value
+              setForm(f => ({ ...f, amount: value === '' ? 0 : Number(value) }))
+            }}
           />
         </div>
       </div>
@@ -108,7 +184,7 @@ export default function TransactionForm({ accounts, categories, initial, onSubmi
 
         {/* Account */}
         <div>
-          <label className="form-label">Account</label>
+          <label className="form-label">{transferSelected ? 'From Account' : 'Account'}</label>
           <select
             className="form-input"
             value={form.accountId}
@@ -121,20 +197,43 @@ export default function TransactionForm({ accounts, categories, initial, onSubmi
         </div>
       </div>
 
-      {/* Category */}
-      <div>
-        <label className="form-label">Category</label>
-        <select
-          className="form-input"
-          value={form.categoryId ?? ''}
-          onChange={e => setForm(f => ({ ...f, categoryId: e.target.value ? parseInt(e.target.value) : undefined }))}
-        >
-          <option value="">No category</option>
-          {categories.map(c => (
-            <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-          ))}
-        </select>
-      </div>
+      {transferSelected && (
+        <div>
+          <label className="form-label">To Account</label>
+          <select
+            className="form-input"
+            value={form.destinationAccountId ?? ''}
+            onChange={e => setForm(f => ({
+              ...f,
+              destinationAccountId: e.target.value ? parseInt(e.target.value) : undefined,
+            }))}
+          >
+            <option value="">Select destination account</option>
+            {accounts
+              .filter(a => a.id !== form.accountId)
+              .map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          <p className="text-xs text-gray-400 mt-1">
+            Transfers create two linked ledger entries (debit + credit) atomically.
+          </p>
+        </div>
+      )}
+
+      {!transferSelected && (
+        <div>
+          <label className="form-label">Category</label>
+          <select
+            className="form-input"
+            value={form.categoryId ?? ''}
+            onChange={e => setForm(f => ({ ...f, categoryId: e.target.value ? parseInt(e.target.value) : undefined }))}
+          >
+            <option value="">No category</option>
+            {categories.map(c => (
+              <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Merchant */}
       <div>

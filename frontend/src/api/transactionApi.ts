@@ -14,6 +14,8 @@ export interface Transaction {
   accountName: string
   category: Category | null
   type: 'INCOME' | 'EXPENSE' | 'TRANSFER'
+  transferLeg?: 'OUT' | 'IN' | null
+  transferGroupId?: string | null
   amount: number
   description: string | null
   merchant: string | null
@@ -23,11 +25,13 @@ export interface Transaction {
 
 export interface CreateTransactionRequest {
   accountId: number
+  destinationAccountId?: number
   categoryId?: number
   type: Transaction['type']
   amount: number
   description?: string
   merchant?: string
+  idempotencyKey?: string
   transactionDate: string
 }
 

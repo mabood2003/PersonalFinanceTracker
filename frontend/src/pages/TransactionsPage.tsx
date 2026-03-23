@@ -109,6 +109,7 @@ export default function TransactionsPage() {
             <option value="">All types</option>
             <option value="INCOME">Income</option>
             <option value="EXPENSE">Expense</option>
+            <option value="TRANSFER">Transfer</option>
           </select>
           <select
             className="form-input py-2 text-sm w-auto"

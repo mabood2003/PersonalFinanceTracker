@@ -9,10 +9,17 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long>, JpaSpecificationExecutor<Transaction> {
 
     Optional<Transaction> findByIdAndUserId(Long id, Long userId);
+
+    List<Transaction> findAllByUserIdAndIdempotencyKey(Long userId, String idempotencyKey);
+
+    Optional<Transaction> findByUserIdAndIdempotencyKeyAndTransferLeg(Long userId, String idempotencyKey, TransferLeg transferLeg);
+
+    List<Transaction> findAllByUserIdAndTransferGroupId(Long userId, UUID transferGroupId);
 
     @Query("SELECT SUM(t.amount) FROM Transaction t WHERE t.user.id = :userId AND t.category.id = :categoryId " +
            "AND t.type = 'EXPENSE' AND t.transactionDate >= :startDate AND t.transactionDate <= :endDate")

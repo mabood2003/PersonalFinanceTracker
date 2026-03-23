@@ -11,6 +11,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Entity
 @Table(name = "transactions")
@@ -46,4 +47,14 @@ public class Transaction extends BaseEntity {
 
     @Column(name = "transaction_date", nullable = false)
     private LocalDate transactionDate;
+
+    @Column(name = "idempotency_key", length = 100)
+    private String idempotencyKey;
+
+    @Column(name = "transfer_group_id")
+    private UUID transferGroupId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transfer_leg", length = 3)
+    private TransferLeg transferLeg;
 }

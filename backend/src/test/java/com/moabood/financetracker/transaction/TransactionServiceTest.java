@@ -13,10 +13,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -80,7 +80,7 @@ class TransactionServiceTest {
         setId(transaction, 10L);
 
         when(userService.getCurrentUser()).thenReturn(user);
-        when(transactionRepository.findById(10L)).thenReturn(Optional.of(transaction));
+        when(transactionRepository.findByIdAndUserId(10L, 1L)).thenReturn(Optional.of(transaction));
 
         transactionService.deleteTransaction(10L);
 
@@ -91,7 +91,7 @@ class TransactionServiceTest {
     @Test
     void shouldThrowResourceNotFound_whenTransactionDoesNotExist() {
         when(userService.getCurrentUser()).thenReturn(user);
-        when(transactionRepository.findById(99L)).thenReturn(Optional.empty());
+        when(transactionRepository.findByIdAndUserId(99L, 1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> transactionService.deleteTransaction(99L))
                 .isInstanceOf(ResourceNotFoundException.class)
@@ -99,22 +99,90 @@ class TransactionServiceTest {
     }
 
     @Test
-    void shouldThrowAccessDenied_whenUserDoesNotOwnTransaction() {
-        User other = new User();
-        setId(other, 2L);
-
-        Transaction transaction = new Transaction();
-        transaction.setUser(other);
-        transaction.setAccount(account);
-        transaction.setType(TransactionType.EXPENSE);
-        transaction.setAmount(BigDecimal.TEN);
-        setId(transaction, 5L);
-
+    void shouldThrowResourceNotFound_whenUserDoesNotOwnTransaction() {
         when(userService.getCurrentUser()).thenReturn(user);
-        when(transactionRepository.findById(5L)).thenReturn(Optional.of(transaction));
+        when(transactionRepository.findByIdAndUserId(5L, 1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> transactionService.deleteTransaction(5L))
-                .isInstanceOf(AccessDeniedException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    void shouldCreateTransferTransaction_withDoubleEntryAndBalanceUpdates() {
+        Account destination = new Account();
+        destination.setUser(user);
+        destination.setBalance(new BigDecimal("300.00"));
+        setId(destination, 2L);
+
+        when(userService.getCurrentUser()).thenReturn(user);
+        when(accountRepository.findByIdAndUserId(1L, 1L)).thenReturn(Optional.of(account));
+        when(accountRepository.findByIdAndUserId(2L, 1L)).thenReturn(Optional.of(destination));
+        when(transactionRepository.findAllByUserIdAndIdempotencyKey(1L, "transfer-key-1")).thenReturn(List.of());
+        when(transactionMapper.toDto(any())).thenReturn(mock(TransactionDto.class));
+
+        CreateTransactionRequest request = new CreateTransactionRequest();
+        request.setAccountId(1L);
+        request.setDestinationAccountId(2L);
+        request.setType(TransactionType.TRANSFER);
+        request.setAmount(new BigDecimal("125.00"));
+        request.setTransactionDate(LocalDate.of(2026, 3, 23));
+        request.setIdempotencyKey("transfer-key-1");
+
+        transactionService.createTransaction(request);
+
+        assertThat(account.getBalance()).isEqualByComparingTo("875.00");
+        assertThat(destination.getBalance()).isEqualByComparingTo("425.00");
+        verify(transactionRepository).saveAll(any());
+    }
+
+    @Test
+    void shouldReturnExistingTransfer_whenIdempotencyKeyIsReusedWithSamePayload() {
+        Account destination = new Account();
+        destination.setUser(user);
+        destination.setBalance(new BigDecimal("300.00"));
+        setId(destination, 2L);
+
+        Transaction transferOut = new Transaction();
+        transferOut.setUser(user);
+        transferOut.setAccount(account);
+        transferOut.setType(TransactionType.TRANSFER);
+        transferOut.setTransferLeg(TransferLeg.OUT);
+        transferOut.setAmount(new BigDecimal("50.00"));
+        transferOut.setTransactionDate(LocalDate.of(2026, 3, 23));
+        transferOut.setDescription("Move to savings");
+        transferOut.setMerchant("Internal");
+
+        Transaction transferIn = new Transaction();
+        transferIn.setUser(user);
+        transferIn.setAccount(destination);
+        transferIn.setType(TransactionType.TRANSFER);
+        transferIn.setTransferLeg(TransferLeg.IN);
+        transferIn.setAmount(new BigDecimal("50.00"));
+        transferIn.setTransactionDate(LocalDate.of(2026, 3, 23));
+        transferIn.setDescription("Move to savings");
+        transferIn.setMerchant("Internal");
+
+        TransactionDto existingDto = mock(TransactionDto.class);
+
+        when(userService.getCurrentUser()).thenReturn(user);
+        when(transactionRepository.findAllByUserIdAndIdempotencyKey(1L, "transfer-key-2"))
+                .thenReturn(List.of(transferOut, transferIn));
+        when(transactionMapper.toDto(transferOut)).thenReturn(existingDto);
+
+        CreateTransactionRequest request = new CreateTransactionRequest();
+        request.setAccountId(1L);
+        request.setDestinationAccountId(2L);
+        request.setType(TransactionType.TRANSFER);
+        request.setAmount(new BigDecimal("50.00"));
+        request.setTransactionDate(LocalDate.of(2026, 3, 23));
+        request.setDescription("Move to savings");
+        request.setMerchant("Internal");
+        request.setIdempotencyKey("transfer-key-2");
+
+        TransactionDto result = transactionService.createTransaction(request);
+
+        assertThat(result).isSameAs(existingDto);
+        verify(transactionRepository, never()).saveAll(any());
     }
 
     // Reflection helper to set id on BaseEntity subclasses

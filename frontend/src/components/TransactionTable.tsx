@@ -14,6 +14,19 @@ function formatDate(dateStr: string) {
   })
 }
 
+function amountPresentation(transaction: Transaction) {
+  if (transaction.type === 'INCOME') {
+    return { sign: '+', className: 'text-success-600' }
+  }
+  if (transaction.type === 'EXPENSE') {
+    return { sign: '-', className: 'text-danger-600' }
+  }
+  if (transaction.transferLeg === 'IN') {
+    return { sign: '+', className: 'text-primary-600' }
+  }
+  return { sign: '-', className: 'text-primary-600' }
+}
+
 export default function TransactionTable({ transactions, onEdit, onDelete, compact = false }: Props) {
   if (transactions.length === 0) {
     return (
@@ -41,7 +54,9 @@ export default function TransactionTable({ transactions, onEdit, onDelete, compa
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
-          {transactions.map((t) => (
+          {transactions.map((t) => {
+            const amountUi = amountPresentation(t)
+            return (
             <tr key={t.id} className="group hover:bg-gray-50/70 transition-colors">
               <td className="py-3.5 pl-1 pr-4 text-gray-500 whitespace-nowrap text-xs">
                 {formatDate(t.transactionDate)}
@@ -55,7 +70,11 @@ export default function TransactionTable({ transactions, onEdit, onDelete, compa
                 )}
               </td>
               <td className="py-3.5 pr-4">
-                {t.category ? (
+                {t.type === 'TRANSFER' ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs bg-primary-50 text-primary-700 rounded-full px-2.5 py-1 font-medium whitespace-nowrap">
+                    Transfer
+                  </span>
+                ) : t.category ? (
                   <span className="inline-flex items-center gap-1.5 text-xs bg-gray-100 text-gray-600 rounded-full px-2.5 py-1 font-medium whitespace-nowrap">
                     {t.category.icon}
                     {t.category.name}
@@ -68,8 +87,8 @@ export default function TransactionTable({ transactions, onEdit, onDelete, compa
                 <td className="py-3.5 pr-4 text-gray-500 text-xs whitespace-nowrap">{t.accountName}</td>
               )}
               <td className="py-3.5 pr-1 text-right whitespace-nowrap">
-                <span className={`font-semibold text-sm ${t.type === 'INCOME' ? 'text-success-600' : 'text-danger-600'}`}>
-                  {t.type === 'INCOME' ? '+' : '-'}${Math.abs(t.amount).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span className={`font-semibold text-sm ${amountUi.className}`}>
+                  {amountUi.sign}${Math.abs(t.amount).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </td>
               {!compact && onEdit && (
@@ -93,7 +112,7 @@ export default function TransactionTable({ transactions, onEdit, onDelete, compa
                 </td>
               )}
             </tr>
-          ))}
+          )})}
         </tbody>
       </table>
     </div>

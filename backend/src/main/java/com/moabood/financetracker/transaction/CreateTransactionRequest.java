@@ -16,6 +16,8 @@ public class CreateTransactionRequest {
     @NotNull
     private Long accountId;
 
+    private Long destinationAccountId;
+
     private Long categoryId;
 
     @NotNull
@@ -30,6 +32,9 @@ public class CreateTransactionRequest {
 
     @Size(max = 100)
     private String merchant;
+
+    @Size(max = 100)
+    private String idempotencyKey;
 
     @NotNull
     private LocalDate transactionDate;

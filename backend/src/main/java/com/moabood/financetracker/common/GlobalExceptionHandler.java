@@ -12,6 +12,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.util.HashMap;
@@ -88,6 +89,22 @@ public class GlobalExceptionHandler {
                 .status(400)
                 .error("Bad Request")
                 .message("Malformed JSON or invalid enum value")
+                .path(request.getRequestURI())
+                .build());
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException ex, HttpServletRequest request) {
+        int statusCode = ex.getStatusCode().value();
+        HttpStatus status = HttpStatus.resolve(statusCode);
+        String error = status != null ? status.getReasonPhrase() : "Request Failed";
+        String message = ex.getReason() != null ? ex.getReason() : "Request failed";
+
+        return ResponseEntity.status(statusCode).body(ErrorResponse.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(statusCode)
+                .error(error)
+                .message(message)
                 .path(request.getRequestURI())
                 .build());
     }
