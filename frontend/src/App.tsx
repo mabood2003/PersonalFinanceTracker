@@ -8,6 +8,9 @@ import DashboardPage from './pages/DashboardPage'
 import TransactionsPage from './pages/TransactionsPage'
 import BudgetsPage from './pages/BudgetsPage'
 import AccountsPage from './pages/AccountsPage'
+import GoalsPage from './pages/GoalsPage'
+import RecurringPage from './pages/RecurringPage'
+import ProfilePage from './pages/ProfilePage'
 
 export default function App() {
   return (
@@ -22,6 +25,9 @@ export default function App() {
               <Route path="/transactions" element={<TransactionsPage />} />
               <Route path="/budgets" element={<BudgetsPage />} />
               <Route path="/accounts" element={<AccountsPage />} />
+              <Route path="/goals" element={<GoalsPage />} />
+              <Route path="/recurring" element={<RecurringPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

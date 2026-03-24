@@ -204,3 +204,34 @@ export function ShieldIcon({ className, size }: IconProps) {
     </svg>
   )
 }
+
+export function GoalIcon({ className, size }: IconProps) {
+  return (
+    <svg {...props(className, size)}>
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="12" r="6" />
+      <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+export function RecurringIcon({ className, size }: IconProps) {
+  return (
+    <svg {...props(className, size)}>
+      <path d="M17 2l4 4-4 4" />
+      <path d="M3 11V9a4 4 0 014-4h14" />
+      <path d="M7 22l-4-4 4-4" />
+      <path d="M21 13v2a4 4 0 01-4 4H3" />
+    </svg>
+  )
+}
+
+export function DownloadIcon({ className, size }: IconProps) {
+  return (
+    <svg {...props(className, size)}>
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  )
+}

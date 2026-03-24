@@ -5,10 +5,12 @@ import { analyticsApi, type MonthlySummary, type CategoryBreakdown, type Spendin
 import { transactionApi, type Transaction } from '../api/transactionApi'
 import { accountApi, type Account } from '../api/accountApi'
 import { budgetApi, type BudgetProgress } from '../api/budgetApi'
+import { netWorthApi, type NetWorthSnapshot } from '../api/netWorthApi'
 import SpendingChart from '../components/SpendingChart'
 import TrendChart from '../components/TrendChart'
 import TransactionTable from '../components/TransactionTable'
 import { TrendUpIcon, TrendDownIcon, ArrowRightIcon, WalletIcon } from '../components/Icons'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 function fmt(n: number) {
   return n.toLocaleString('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 })
@@ -36,6 +38,7 @@ export default function DashboardPage() {
   const [recent, setRecent] = useState<Transaction[]>([])
   const [totalBalance, setTotalBalance] = useState(0)
   const [alertBudgets, setAlertBudgets] = useState<BudgetProgress[]>([])
+  const [netWorthHistory, setNetWorthHistory] = useState<NetWorthSnapshot[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -52,13 +55,15 @@ export default function DashboardPage() {
       transactionApi.getAll({ size: 6, sort: 'transactionDate,desc' }),
       accountApi.getAll(),
       budgetApi.getAll(),
-    ]).then(([s, b, t, txns, accounts, budgets]) => {
+      netWorthApi.getHistory(90),
+    ]).then(([s, b, t, txns, accounts, budgets, nw]) => {
       setSummary(s)
       setBreakdown(b)
       setTrend(t)
       setRecent(txns.content)
       setTotalBalance(accounts.reduce((sum, a) => sum + netWorthContribution(a), 0))
       setAlertBudgets(budgets.filter(bud => bud.status !== 'ON_TRACK'))
+      setNetWorthHistory(nw)
     }).catch(console.error).finally(() => setLoading(false))
   }, [])
 
@@ -156,6 +161,59 @@ export default function DashboardPage() {
           <TrendChart data={trend} />
         </div>
       </div>
+
+      {/* Net Worth History */}
+      {netWorthHistory.length > 1 && (
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="section-title">Net Worth History</h2>
+            <span className="text-xs text-gray-400">Last 90 days</span>
+          </div>
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={netWorthHistory} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="nwGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#1D4ED8" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#1D4ED8" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F0F4FA" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 11, fill: '#9CA3AF' }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={d => {
+                  const date = new Date(d)
+                  return `${date.toLocaleString('default', { month: 'short' })} ${date.getDate()}`
+                }}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: '#9CA3AF' }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={v => `$${Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`}
+                width={48}
+              />
+              <Tooltip
+                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
+                formatter={(value: number) => [fmt(value), 'Net Worth']}
+                labelFormatter={d => new Date(d).toLocaleDateString('en-CA', { month: 'long', day: 'numeric' })}
+              />
+              <Area
+                type="monotone"
+                dataKey="netWorth"
+                stroke="#1D4ED8"
+                strokeWidth={2}
+                fill="url(#nwGradient)"
+                dot={false}
+                activeDot={{ r: 4, fill: '#1D4ED8' }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Recent transactions */}
       <div className="card p-6">

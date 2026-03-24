@@ -12,6 +12,7 @@ import com.moabood.financetracker.user.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
@@ -375,6 +376,35 @@ public class TransactionService {
                 .findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
                         "Transfer group is missing the " + leg + " ledger leg"));
+    }
+
+    @Transactional(readOnly = true)
+    public String exportCsv(TransactionFilterRequest filter) {
+        User user = userService.getCurrentUser();
+        Specification<Transaction> spec = TransactionSpecification.withFilters(user.getId(), filter);
+        List<Transaction> transactions = transactionRepository.findAll(
+                spec, Sort.by(Sort.Direction.DESC, "transactionDate"));
+
+        StringBuilder csv = new StringBuilder();
+        csv.append("Date,Type,Amount,Account,Category,Merchant,Description\n");
+        for (Transaction t : transactions) {
+            csv.append(t.getTransactionDate()).append(",");
+            csv.append(t.getType().name()).append(",");
+            csv.append(t.getAmount()).append(",");
+            csv.append(csvEscape(t.getAccount().getName())).append(",");
+            csv.append(csvEscape(t.getCategory() != null ? t.getCategory().getName() : "")).append(",");
+            csv.append(csvEscape(t.getMerchant() != null ? t.getMerchant() : "")).append(",");
+            csv.append(csvEscape(t.getDescription() != null ? t.getDescription() : "")).append("\n");
+        }
+        return csv.toString();
+    }
+
+    private String csvEscape(String value) {
+        if (value == null || value.isEmpty()) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 
     private Account getOwnedAccount(Long userId, Long accountId) {

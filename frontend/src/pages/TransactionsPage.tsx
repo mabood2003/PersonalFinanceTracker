@@ -5,7 +5,8 @@ import { categoryApi } from '../api/categoryApi'
 import type { Category } from '../api/transactionApi'
 import TransactionTable from '../components/TransactionTable'
 import TransactionForm from '../components/TransactionForm'
-import { PlusIcon, SearchIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon } from '../components/Icons'
+import { PlusIcon, SearchIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, DownloadIcon } from '../components/Icons'
+import api from '../api/axiosConfig'
 
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
@@ -75,6 +76,23 @@ export default function TransactionsPage() {
     loadTransactions()
   }
 
+  async function handleExportCsv() {
+    const params: Record<string, string> = {}
+    if (filter.type) params.type = filter.type
+    if (filter.categoryId) params.categoryId = String(filter.categoryId)
+    if (filter.startDate) params.startDate = filter.startDate
+    if (filter.endDate) params.endDate = filter.endDate
+    if (filter.search) params.search = filter.search
+
+    const res = await api.get('/transactions/export', { params, responseType: 'blob' })
+    const url = URL.createObjectURL(new Blob([res.data], { type: 'text/csv' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `transactions-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -83,11 +101,17 @@ export default function TransactionsPage() {
           <h1 className="page-title">Transactions</h1>
           <p className="text-sm text-gray-500 mt-0.5">{total.toLocaleString()} total</p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary text-sm flex items-center gap-2">
-          <PlusIcon size={16} />
-          <span className="hidden sm:inline">Add Transaction</span>
-          <span className="sm:hidden">Add</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleExportCsv} className="btn-secondary text-sm flex items-center gap-2">
+            <DownloadIcon size={15} />
+            <span className="hidden sm:inline">Export CSV</span>
+          </button>
+          <button onClick={() => setShowForm(true)} className="btn-primary text-sm flex items-center gap-2">
+            <PlusIcon size={16} />
+            <span className="hidden sm:inline">Add Transaction</span>
+            <span className="sm:hidden">Add</span>
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

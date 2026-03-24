@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   DashboardIcon, TransactionsIcon, BudgetIcon, AccountsIcon,
-  LogoutIcon, MenuIcon, CloseIcon, WalletIcon,
+  LogoutIcon, MenuIcon, CloseIcon, WalletIcon, GoalIcon, RecurringIcon,
 } from './Icons'
 
 const navItems = [
@@ -11,6 +11,8 @@ const navItems = [
   { to: '/transactions', label: 'Transactions',   Icon: TransactionsIcon },
   { to: '/budgets',      label: 'Budgets',        Icon: BudgetIcon },
   { to: '/accounts',     label: 'Accounts',       Icon: AccountsIcon },
+  { to: '/goals',        label: 'Goals',          Icon: GoalIcon },
+  { to: '/recurring',    label: 'Recurring',      Icon: RecurringIcon },
 ]
 
 export default function Layout() {
@@ -85,17 +87,21 @@ export default function Layout() {
 
         {/* User section */}
         <div className="px-3 py-4 border-t border-white/10">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-xl">
+          <Link
+            to="/profile"
+            onClick={() => setMobileOpen(false)}
+            className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/8 transition-colors group"
+          >
             <div className="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center flex-shrink-0">
               <span className="text-xs font-bold text-white">{initials}</span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
+              <p className="text-sm font-medium text-white truncate group-hover:text-white">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-xs text-navy-400 truncate">{user?.email}</p>
+              <p className="text-xs text-navy-400 truncate">View profile</p>
             </div>
-          </div>
+          </Link>
           <button
             onClick={handleLogout}
             className="mt-1 w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium

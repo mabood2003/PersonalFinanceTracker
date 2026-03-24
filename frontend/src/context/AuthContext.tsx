@@ -8,6 +8,7 @@ interface AuthContextValue {
   login: (req: LoginRequest) => Promise<void>
   register: (req: RegisterRequest) => Promise<void>
   logout: () => void
+  updateUser: (u: { email: string; firstName: string; lastName: string }) => void
   isAuthenticated: boolean
 }
 
@@ -60,8 +61,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('user')
   }
 
+  function updateUser(u: { email: string; firstName: string; lastName: string }) {
+    setUser(u)
+    localStorage.setItem('user', JSON.stringify(u))
+  }
+
   return (
-    <AuthContext.Provider value={{ token, user, login, register, logout, isAuthenticated: !!token }}>
+    <AuthContext.Provider value={{ token, user, login, register, logout, updateUser, isAuthenticated: !!token }}>
       {children}
     </AuthContext.Provider>
   )
